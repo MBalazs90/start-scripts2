@@ -16,7 +16,7 @@ executablestest=$(ls executables.tar.gz)
                     fi
 
 #install sshpas
-sudo apt-get install -y sshpass
+sudo yum install -y sshpass
 
 #Get password for postgres
     echo -e "\e[96m Please enter the password for the database.  \e[39m"
@@ -150,7 +150,7 @@ export SSHPASS="$sspass1"
 	echo -e "\e[96m Starting master's install. \e[39m"
 
 #update system
-    sudo apt-get update
+    sudo yum update -y
 #create directory structure
     sudo mkdir /opt/sliceup
     sudo mkdir /opt/sliceup/scripts
@@ -178,44 +178,46 @@ export SSHPASS="$sspass1"
     echo -e "\e[96m Extract Files and install JAVA  \e[39m"
     sudo tar -xvzf executables.tar.gz --directory /opt/sliceup/
     #sudo chmod -R a+r /opt/sliceup
-    sudo apt install openjdk-11-jre-headless -y
-    sudo apt install openjdk-11-jdk-headless -y
+    sudo yum install java-11-openjdk -y
+    sudo yum install java-11-openjdk-headless -y
 
 #changing curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
     echo -e "\e[96m Install Vector and Postgres  \e[39m"
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-amd64.deb
-    sudo dpkg -i vector-amd64.deb
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.9.X/vector-x86_64.rpm
+    sudo rpm -i vector-x86_64.rpm
     sudo systemctl start vector
-    sudo apt install postgresql-client -y
-    sudo apt install postgresql -y
+    sudo yum install https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm -y
+    sudo yum install postgresql10-server postgresql10-contrib postgresql10-devel -y
+    sudo /usr/pgsql-10/bin/postgresql-10-setup initdb
+    sudo systemctl start postgresql-10
     sleep 10
 
 #create variable requires config for sliceupdev
     echo -e "\e[96m Config Postgres.  \e[39m"
-    sudo -u postgres psql -c "CREATE USER sliceup WITH PASSWORD '$psqlpass';"
-    sudo -u postgres psql -c "ALTER ROLE sliceup WITH SUPERUSER INHERIT CREATEROLE CREATEDB LOGIN NOREPLICATION NOBYPASSRLS;"
-    sudo -u postgres psql -c "CREATE DATABASE sliceup"
-    sudo -u postgres psql sliceup < /opt/sliceup/executables/db_migration/sourcedb.sql
+    sudo -i -u postgres psql -c "CREATE USER sliceup WITH PASSWORD '$psqlpass';"
+    sudo -i -u postgres psql -c "ALTER ROLE sliceup WITH SUPERUSER INHERIT CREATEROLE CREATEDB LOGIN NOREPLICATION NOBYPASSRLS;"
+    sudo -i -u postgres psql -c "CREATE DATABASE sliceup"
+    sudo -i -u postgres psql sliceup < /opt/sliceup/executables/db_migration/sourcedb.sql
 
 #Lock this down and standardize install
 
-    sudo sed -i "s/#listen_addresses.*/listen_addresses = '*'/" /etc/postgresql/10/main/postgresql.conf
+    sudo sed -i "s/#listen_addresses.*/listen_addresses = '*'/" /var/lib/pgsql/10/data/postgresql.conf
    
 
 # take user entered IP addresses and create hba config
     for address in "${ipaddresses[@]}"
     do
         line="host    all             all             $address\/32            md5"
-        sudo sed -i "s/# IPv4 local connections:/# IPv4 local connections:\n$line/" /etc/postgresql/10/main/pg_hba.conf
+        sudo sed -i "s/# IPv4 local connections:/# IPv4 local connections:\n$line/" /var/lib/pgsql/10/data/pg_hba.conf
     done
 
     line="host    all             all             $masterip\/32            md5"
-    sudo sed -i "s/# IPv4 local connections:/# IPv4 local connections:\n$line/" /etc/postgresql/10/main/pg_hba.conf
+    sudo sed -i "s/# IPv4 local connections:/# IPv4 local connections:\n$line/" /var/lib/pgsql/10/data/pg_hba.conf
 
 
     echo -e "\e[96m Install additonal supporting files.  \e[39m"
 
-    sudo systemctl restart postgresql
+    sudo systemctl restart postgresql-10
     sudo apt-get install libpq-dev -y
     sudo apt-get install python-dev -y
     sudo apt-get install python3-dev -y
